@@ -211,7 +211,7 @@ node scripts/publish-apk.js
 
 客户端更新流程：启动时检查 → 非强制弹窗 / 强制弹窗 → 应用内 `downloadAndInstallApk()` 流式下载 + 进度遮罩 → 系统安装器接管（拒绝 `Linking.openURL` 浏览器下载）。
 
-## 关键约定
+## 另请注意
 
 - **API 硬编码**　`lib/api.ts` 中 `API_BASE` 不走相对路径（RN 无同源概念）
 - **vendor 资源内联**　marked / KaTeX / highlight.js 通过 `scripts/gen-vendor.js` 在构建时内联为 `.ts`，禁止运行时 `expo-asset` 加载（会触发 native 模块冲突导致 AsyncStorage 数据丢失）
