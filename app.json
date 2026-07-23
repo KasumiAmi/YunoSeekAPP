@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "YunoSeek",
+    "slug": "yunoseek",
+    "version": "1.0.1_0722",
+    "runtimeVersion": "1.0.1",
+    "updates": {
+      "url": "https://yunoseek.ownbangdream.asia/api/ota/manifest",
+      "enabled": true,
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0,
+      "assetPatternsToBeBundled": ["**/*"]
+    },
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "yunoseek",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "asia.ownbangdream.yunoseek"
+    },
+    "android": {
+      "package": "asia.ownbangdream.yunoseek",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/monochrome-icon.png"
+      },
+      "enableEdgeToEdge": true,
+      "windowSoftInputMode": "adjustResize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "splash": {
+      "image": "./assets/about-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f5f6f8",
+      "dark": {
+        "image": "./assets/about-logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1d1f24"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "用于上传图片到对话",
+          "cameraPermission": "用于拍照上传到对话"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
