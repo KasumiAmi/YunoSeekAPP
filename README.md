@@ -1,4 +1,4 @@
-# YunoSeek
+# YunoSeek APP
 
 <p align="center">
   <img src="./assets/yunoseek-logo.png" alt="YunoSeek" width="120" />
@@ -18,7 +18,7 @@
 
 ---
 
-YunoSeek 是 [YunoSeek网页版](https://yunoseek.ownbangdream.asia) 自托管后端的 React Native 原生客户端。已配置有 6 位BanG Dream! YUME∞MITA（喜报，这是梦限大）角色与 DeepSeek 风格的对话 UI 结合，提供流式响应、深度思考、联网搜索、图片识图、引继码同步、放送日程、知识库归档以及应用内 OTA（项目当前未加入） / APK 自更新等完整功能。
+YunoSeek APP是 [YunoSeek网页版](https://yunoseek.ownbangdream.asia) 自托管后端的 React Native 原生客户端。已配置有 6 位BanG Dream! YUME∞MITA（喜报，这是梦限大）角色与 DeepSeek 风格的对话 UI 结合，提供流式响应、深度思考、联网搜索、图片识图、引继码同步、放送日程、知识库归档以及应用内 OTA（项目当前未加入） / APK 自更新等完整功能。
 
 **⚠️BanG Dream! ，BanG Dream! YUME∞MITA的所有权为Bushiroad所有**
 <p align="center">
