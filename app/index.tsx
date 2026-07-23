@@ -25,7 +25,6 @@ import {
   KeyboardAvoidingView,
   useColorScheme,
   useWindowDimensions,
-  Alert,
   BackHandler,
   type ImageSourcePropType,
 } from "react-native";
@@ -53,6 +52,7 @@ import { ProfileModal } from "../components/ProfileModal";
 import { AnnouncementBanner } from "../components/AnnouncementBanner";
 import { useApkDownload } from "../lib/use-apk-download";
 import { ApkDownloadOverlay } from "../components/ApkDownloadOverlay";
+import { UpdateDialog, type UpdateDialogConfig } from "../components/UpdateDialog";
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -112,6 +112,9 @@ export default function ChatScreen() {
 
   // APK 应用内下载（替代浏览器 Linking.openURL）
   const { downloading, progress, download } = useApkDownload();
+
+  // 启动时的更新提示弹窗（替代 Android 原生 Alert）
+  const [updateDialog, setUpdateDialog] = useState<UpdateDialogConfig | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -179,25 +182,40 @@ export default function ChatScreen() {
     if (apkPromptShownRef.current) return;
     apkPromptShownRef.current = true;
     const url = apkUpdateAvailable.apkDownloadUrl;
+    const message =
+      apkUpdateAvailable.changelog || `新版本 ${apkUpdateAvailable.latestVersion} 可用`;
     if (apkUpdateAvailable.forceUpdate) {
-      // 强制更新：不可关闭的 Alert
-      Alert.alert(
-        "必须更新",
-        apkUpdateAvailable.changelog || "当前版本过旧，请更新到最新版本",
-        url ? [{ text: "立即下载", onPress: () => download(url) }] : [{ text: "好的" }]
-      );
+      // 强制更新：不可关闭
+      setUpdateDialog({
+        variant: "force",
+        title: "必须更新",
+        message,
+        latestVersion: apkUpdateAvailable.latestVersion,
+        confirmText: "立即下载",
+        onConfirm: url
+          ? () => {
+              setUpdateDialog(null);
+              download(url);
+            }
+          : undefined,
+      });
     } else {
       // 非强制：可忽略
-      Alert.alert(
-        "发现新版本",
-        apkUpdateAvailable.changelog || `新版本 ${apkUpdateAvailable.latestVersion} 可用`,
-        url
-          ? [
-              { text: "稍后", style: "cancel" },
-              { text: "立即下载", onPress: () => download(url) },
-            ]
-          : [{ text: "好的" }]
-      );
+      setUpdateDialog({
+        variant: "info",
+        title: "发现新版本",
+        message,
+        latestVersion: apkUpdateAvailable.latestVersion,
+        confirmText: "立即下载",
+        cancelText: "稍后",
+        onConfirm: url
+          ? () => {
+              setUpdateDialog(null);
+              download(url);
+            }
+          : undefined,
+        onCancel: () => setUpdateDialog(null),
+      });
     }
   }, [apkUpdateAvailable]);
 
@@ -894,6 +912,13 @@ export default function ChatScreen() {
 
       {/* APK 下载进度遮罩 */}
       <ApkDownloadOverlay visible={downloading} progress={progress} />
+
+      {/* 启动时的更新提示弹窗 */}
+      <UpdateDialog
+        visible={updateDialog !== null}
+        config={updateDialog}
+        onRequestClose={() => setUpdateDialog(null)}
+      />
     </View>
     </GestureDetector>
   );

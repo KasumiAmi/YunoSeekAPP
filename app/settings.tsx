@@ -28,6 +28,7 @@ import { connectionPing, providerModels, type ConnectionPingResult } from "../li
 import { checkAppVersion } from "../lib/update-check";
 import { useApkDownload } from "../lib/use-apk-download";
 import { ApkDownloadOverlay } from "../components/ApkDownloadOverlay";
+import { UpdateDialog, type UpdateDialogConfig } from "../components/UpdateDialog";
 import { InfoIcon, ChevronRightIcon, RefreshIcon } from "../components/icons";
 
 export default function SettingsScreen() {
@@ -56,6 +57,9 @@ export default function SettingsScreen() {
 
   // APK 应用内下载（替代浏览器 Linking.openURL）
   const { downloading, progress, download } = useApkDownload();
+
+  // 更新提示弹窗（替代 Android 原生 Alert）
+  const [updateDialog, setUpdateDialog] = useState<UpdateDialogConfig | null>(null);
 
   const mode = resolveThemeMode(themeMode, systemScheme);
   const theme = getTheme(mode, profile.themeColor);
@@ -129,32 +133,45 @@ export default function SettingsScreen() {
       if (apkResult.hasUpdate && apkResult.apkDownloadUrl) {
         setApkUpdateAvailable(apkResult);
         // APK 优先（原生变更必须整包更新）：弹窗显示 changelog
-        Alert.alert(
-          apkResult.forceUpdate ? "必须更新" : "发现新版本",
-          apkResult.changelog || `新版本 ${apkResult.latestVersion} 可用`,
-          apkResult.forceUpdate
-            ? [
-                {
-                  text: "立即下载",
-                  onPress: () => download(apkResult.apkDownloadUrl!),
-                },
-              ]
-            : [
-                { text: "稍后", style: "cancel" },
-                {
-                  text: "立即下载",
-                  onPress: () => download(apkResult.apkDownloadUrl!),
-                },
-              ]
-        );
+        setUpdateDialog({
+          variant: apkResult.forceUpdate ? "force" : "info",
+          title: apkResult.forceUpdate ? "必须更新" : "发现新版本",
+          message: apkResult.changelog || `新版本 ${apkResult.latestVersion} 可用`,
+          latestVersion: apkResult.latestVersion,
+          confirmText: "立即下载",
+          cancelText: "稍后",
+          onConfirm: () => {
+            setUpdateDialog(null);
+            download(apkResult.apkDownloadUrl!);
+          },
+          onCancel: apkResult.forceUpdate ? undefined : () => setUpdateDialog(null),
+        });
       } else if (otaUpdated) {
-        // OTA 已下载：UI 会自动显示"重启生效"按钮，无需额外弹窗
-        Alert.alert("更新已就绪", "热更新已下载，点击「重启生效」立即应用");
+        // OTA 已下载：UI 会自动显示"重启生效"按钮，弹窗仅作提示
+        setUpdateDialog({
+          variant: "ready",
+          title: "更新已就绪",
+          message: "热更新已下载，点击「重启生效」立即应用",
+          confirmText: "知道了",
+          onConfirm: () => setUpdateDialog(null),
+        });
       } else {
-        Alert.alert("已是最新", "当前已是最新版本");
+        setUpdateDialog({
+          variant: "latest",
+          title: "已是最新",
+          message: "当前已是最新版本",
+          confirmText: "好的",
+          onConfirm: () => setUpdateDialog(null),
+        });
       }
     } catch (err: any) {
-      Alert.alert("检查失败", err?.message || "请稍后重试");
+      setUpdateDialog({
+        variant: "error",
+        title: "检查失败",
+        message: err?.message || "请稍后重试",
+        confirmText: "好的",
+        onConfirm: () => setUpdateDialog(null),
+      });
     } finally {
       setChecking(false);
     }
@@ -439,6 +456,11 @@ export default function SettingsScreen() {
       </ScrollView>
       </KeyboardAvoidingView>
       <ApkDownloadOverlay visible={downloading} progress={progress} />
+      <UpdateDialog
+        visible={updateDialog !== null}
+        config={updateDialog}
+        onRequestClose={() => setUpdateDialog(null)}
+      />
     </SafeAreaView>
   );
 }

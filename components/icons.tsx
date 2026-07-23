@@ -125,3 +125,45 @@ export function RefreshIcon({ size = 24, color = "#000", style }: IconProps) {
     </Svg>
   );
 }
+
+// ── 下载（更新下载按钮）── Lucide download
+export function DownloadIcon({ size = 24, color = "#000", style }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+      <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" {...stroke(color)} />
+      <Polyline points="7 10 12 15 17 10" {...stroke(color)} />
+      <Line x1="12" y1="15" x2="12" y2="3" {...stroke(color)} />
+    </Svg>
+  );
+}
+
+// ── 闪烁星（新版本提示）── Lucide sparkles
+export function SparkleIcon({ size = 24, color = "#000", style }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+      <Path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z" {...stroke(color)} />
+      <Path d="M19 14l.7 1.9L21.6 17l-1.9.7L19 19.6l-.7-1.9L16.4 17l1.9-.7L19 14z" {...stroke(color)} />
+    </Svg>
+  );
+}
+
+// ── 成功圆勾（已是最新/更新就绪）── Lucide check-circle
+export function CheckCircleIcon({ size = 24, color = "#000", style }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+      <Path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" {...stroke(color)} />
+      <Polyline points="22 4 12 14.01 9 11.01" {...stroke(color)} />
+    </Svg>
+  );
+}
+
+// ── 警告三角（必须更新/检查失败）── Lucide alert-triangle
+export function AlertTriangleIcon({ size = 24, color = "#000", style }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" style={style}>
+      <Path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" {...stroke(color)} />
+      <Line x1="12" y1="9" x2="12" y2="13" {...stroke(color)} />
+      <Path d="M12 17h.01" {...stroke(color)} />
+    </Svg>
+  );
+}
