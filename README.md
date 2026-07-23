@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>YunoSeek</strong> · 基于 React Native (Expo) 的角色化 AI 聊天应用
+  <strong>YunoSeek APP</strong> · 基于 React Native (Expo) 的梦限大角色化 AI 聊天应用
 </p>
 
 <p align="center">
