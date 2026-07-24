@@ -155,10 +155,15 @@ async function githubGetWithMirrors(githubUrl, headers = {}) {
 }
 
 /**
- * 流式下载文件到磁盘（支持镜像 fallback + 重定向）
+ * 流式下载文件到磁盘（支持镜像 fallback + 重定向 + 健壮的超时）
  * @param {string} githubUrl 原始 GitHub URL
  * @param {string} destPath 目标文件路径
  * @param {object} headers 请求头
+ *
+ * 关键修复：
+ *   - 流式响应中途停滞/断开时，旧代码依赖 req.on('error') 但 error 实际走 res.on('error')，
+ *     导致 Promise 永不 reject、镜像 fallback 永不触发（表现为"卡住不动"）。
+ *   - 现在 req / res / ws 三个 error 通道都 reject，且数据停滞有独立 watchdog。
  */
 async function downloadToFileWithMirrors(githubUrl, destPath, headers = {}) {
   const order = [];
@@ -179,6 +184,9 @@ async function downloadToFileWithMirrors(githubUrl, destPath, headers = {}) {
       return;
     } catch (e) {
       lastErr = e;
+      console.warn(`[ota-apk] 镜像 ${mirror || "直连"} 失败: ${e.message}`);
+      // 失败后清除该镜像的"首选"缓存，强制下次重新探测
+      if (preferredMirror === mirror) preferredMirror = null;
       // 删除可能的部分文件
       try { fs.unlinkSync(destPath); } catch {}
     }
@@ -187,7 +195,12 @@ async function downloadToFileWithMirrors(githubUrl, destPath, headers = {}) {
 }
 
 /**
- * 流式下载（自动跟随重定向）
+ * 单次流式下载（自动跟随重定向）
+ *
+ * 超时策略：
+ *   - 建连/响应头超时 30s（ghproxy 偶发卡在 TCP/TLS 握手）
+ *   - 数据流停滞超时 30s（响应头已到但数据中途断流——ghproxy 最常见的卡死形态）
+ *   - 这两个超时触发后都保证 reject，让上层能 fallback 到下一个镜像
  */
 function downloadToFile(targetUrl, destPath, headers = {}, maxRedirects = 5) {
   return new Promise((resolve, reject) => {
@@ -201,32 +214,60 @@ function downloadToFile(targetUrl, destPath, headers = {}, maxRedirects = 5) {
       path: parsed.pathname + parsed.search,
       headers: { "User-Agent": "yunoseek-ota/1.0", ...headers },
     };
+
+    // 统一的清理 + reject 通道，保证 Promise 一定有结果
+    let settled = false;
+    let stallTimer = null;
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      if (stallTimer) clearTimeout(stallTimer);
+      try { req.destroy(); } catch {}
+      try { fs.unlinkSync(destPath); } catch {}
+      reject(err);
+    };
+    const succeed = () => {
+      if (settled) return;
+      settled = true;
+      if (stallTimer) clearTimeout(stallTimer);
+      resolve();
+    };
+    // 数据停滞 watchdog：每次收到数据重置 30s 计时
+    const resetStall = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => fail(new Error("数据流停滞超时 (30s)")), 30000);
+    };
+
     const req = lib.request(options, (res) => {
+      // 重定向
       if (
         (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) &&
         res.headers.location &&
         maxRedirects > 0
       ) {
-        const nextUrl = new URL(res.headers.location, targetUrl).href;
+        if (stallTimer) clearTimeout(stallTimer);
         res.resume();
-        return resolve(downloadToFile(nextUrl, destPath, headers, maxRedirects - 1));
+        return resolve(downloadToFile(new URL(res.headers.location, targetUrl).href, destPath, headers, maxRedirects - 1));
       }
       if (res.statusCode !== 200) {
+        if (stallTimer) clearTimeout(stallTimer);
         res.resume();
-        return reject(new Error(`下载失败: HTTP ${res.statusCode}`));
+        return fail(new Error(`下载失败: HTTP ${res.statusCode}`));
       }
+      // 响应头到了，开始监控数据流
+      resetStall();
+      res.on("data", () => resetStall());
+      res.on("error", (e) => fail(e));
+      res.on("aborted", () => fail(new Error("响应被中止")));
+
       const ws = fs.createWriteStream(destPath);
       res.pipe(ws);
-      ws.on("finish", () => ws.close(resolve));
-      ws.on("error", (e) => {
-        try { fs.unlinkSync(destPath); } catch {}
-        reject(e);
-      });
+      ws.on("finish", () => ws.close(succeed));
+      ws.on("error", (e) => fail(e));
     });
-    req.on("error", reject);
-    req.setTimeout(120000, () => {
-      req.destroy(new Error("下载超时"));
-    });
+    req.on("error", (e) => fail(e));
+    // 建连/响应头阶段超时（30s）
+    req.setTimeout(30000, () => fail(new Error("建连/响应头超时 (30s)")));
     req.end();
   });
 }
@@ -267,7 +308,13 @@ function findAssetForAbi(assets, abi) {
 }
 
 /**
- * 查询 GitHub Releases latest（带 5 分钟缓存 + 镜像 fallback）
+ * 查询 GitHub Releases latest（带 5 分钟缓存）
+ *
+ * 认证策略：
+ *   - 有 GITHUB_TOKEN 时直连 api.github.com（5000/h 配额，镜像会丢失 Authorization 头导致回到 60/h）
+ *   - 无 token 时走镜像 fallback（借用镜像 IP 池规避单 IP 限流，但仍受镜像自身配额限制）
+ *
+ * 注意：镜像只用于 asset 下载（公开文件），不用于需要认证的 API 查询。
  */
 async function fetchLatestRelease() {
   // 缓存检查
@@ -288,7 +335,12 @@ async function fetchLatestRelease() {
     headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
   }
 
-  const result = await githubGetWithMirrors(apiUrl, headers);
+  // 有 token：直连 GitHub（镜像不转发 Authorization 头，且镜像共享 IP 易被限流）
+  // 无 token：走镜像 fallback（最后会回落到直连）
+  const result = GITHUB_TOKEN
+    ? await httpsGet(apiUrl, headers)
+    : await githubGetWithMirrors(apiUrl, headers);
+
   if (result.statusCode !== 200) {
     throw new Error(`GitHub API 返回 ${result.statusCode}`);
   }
