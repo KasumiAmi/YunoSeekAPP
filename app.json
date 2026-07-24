@@ -2,8 +2,8 @@
   "expo": {
     "name": "YunoSeek",
     "slug": "yunoseek",
-    "version": "1.0.2_0724",
-    "runtimeVersion": "1.0.2",
+    "version": "1.0.3_0724",
+    "runtimeVersion": "1.0.3",
     "updates": {
       "url": "https://yunoseek.ownbangdream.asia/api/ota/manifest",
       "enabled": true,
