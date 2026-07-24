@@ -53,6 +53,7 @@ import { AnnouncementBanner } from "../components/AnnouncementBanner";
 import { useApkDownload } from "../lib/use-apk-download";
 import { ApkDownloadOverlay } from "../components/ApkDownloadOverlay";
 import { UpdateDialog, type UpdateDialogConfig } from "../components/UpdateDialog";
+import { setSkippedVersion } from "../lib/skipped-version";
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -111,7 +112,7 @@ export default function ChatScreen() {
   const apkUpdateAvailable = useStore((s) => s.apkUpdateAvailable);
 
   // APK 应用内下载（替代浏览器 Linking.openURL）
-  const { downloading, progress, download } = useApkDownload();
+  const { downloading, progress, download, error: downloadError, clearError: clearDownloadError } = useApkDownload();
 
   // 启动时的更新提示弹窗（替代 Android 原生 Alert）
   const [updateDialog, setUpdateDialog] = useState<UpdateDialogConfig | null>(null);
@@ -176,12 +177,16 @@ export default function ChatScreen() {
 
   // APK 整包更新启动弹窗：检测到新版本时提示用户下载。
   // 用 ref 防止同一会话内重复弹窗（用户从 settings 返回时不会再次弹出）。
+  // 用户点"稍后"会持久化跳过此版本，下次启动不再主动弹（手动检查仍会显示）。
   const apkPromptShownRef = useRef(false);
+  // 记录最近一次下载 URL，供下载失败重试使用
+  const lastDownloadUrlRef = useRef<string | null>(null);
   useEffect(() => {
     if (!apkUpdateAvailable?.hasUpdate) return;
     if (apkPromptShownRef.current) return;
     apkPromptShownRef.current = true;
     const url = apkUpdateAvailable.apkDownloadUrl;
+    if (url) lastDownloadUrlRef.current = url;
     const message =
       apkUpdateAvailable.changelog || `新版本 ${apkUpdateAvailable.latestVersion} 可用`;
     if (apkUpdateAvailable.forceUpdate) {
@@ -214,10 +219,38 @@ export default function ChatScreen() {
               download(url);
             }
           : undefined,
-        onCancel: () => setUpdateDialog(null),
+        onCancel: () => {
+          // 持久化跳过此版本，下次启动不再主动弹
+          if (apkUpdateAvailable.latestVersion) {
+            setSkippedVersion(apkUpdateAvailable.latestVersion);
+          }
+          setUpdateDialog(null);
+        },
       });
     }
   }, [apkUpdateAvailable]);
+
+  // 下载失败 → 用 UpdateDialog error 变体提示（替代原生 Alert）
+  useEffect(() => {
+    if (!downloadError) return;
+    setUpdateDialog({
+      variant: "error",
+      title: "下载失败",
+      message: downloadError,
+      confirmText: "关闭",
+      onConfirm: () => {
+        clearDownloadError();
+        setUpdateDialog(null);
+      },
+      retryText: "重试",
+      onRetry: () => {
+        const url = lastDownloadUrlRef.current;
+        clearDownloadError();
+        setUpdateDialog(null);
+        if (url) download(url);
+      },
+    });
+  }, [downloadError]);
 
   const mode = resolveThemeMode(themeMode, systemScheme);
   const theme = getTheme(mode, profile.themeColor);

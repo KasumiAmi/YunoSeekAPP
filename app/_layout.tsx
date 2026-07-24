@@ -11,6 +11,7 @@ import Constants from "expo-constants";
 import { useStore } from "../lib/store";
 import { getTheme, resolveThemeMode } from "../lib/theme";
 import { checkAppVersion } from "../lib/update-check";
+import { getSkippedVersion } from "../lib/skipped-version";
 import { handoffPull } from "../lib/api";
 import { AppSplash } from "../components/AppSplash";
 
@@ -113,6 +114,7 @@ export default function RootLayout() {
   }, []);
 
   // APK 整包更新检查：延迟 5s 检查（比 OTA 更晚，优先级更低）
+  // 跳过用户已主动忽略的版本（点过"稍后"的同版本不再主动弹）
   useEffect(() => {
     if (__DEV__ || Platform.OS !== "android") return;
     const currentVersionCode = Constants.expoConfig?.android?.versionCode ?? 1;
@@ -120,6 +122,11 @@ export default function RootLayout() {
       try {
         const result = await checkAppVersion(currentVersionCode);
         if (result.hasUpdate && result.apkDownloadUrl) {
+          const skipped = await getSkippedVersion();
+          if (skipped && result.latestVersion && skipped === result.latestVersion) {
+            // 用户已主动忽略此版本，不写入 store（手动检查仍会显示）
+            return;
+          }
           useStore.getState().setApkUpdateAvailable(result);
         }
       } catch {

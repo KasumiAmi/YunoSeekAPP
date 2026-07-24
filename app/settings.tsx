@@ -1,5 +1,5 @@
 // 设置页：主题/语言/角色/AI 模式/服务状态
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -56,7 +56,9 @@ export default function SettingsScreen() {
   const [checking, setChecking] = useState(false);
 
   // APK 应用内下载（替代浏览器 Linking.openURL）
-  const { downloading, progress, download } = useApkDownload();
+  const { downloading, progress, download, error: downloadError, clearError: clearDownloadError } = useApkDownload();
+  // 记录最近一次下载 URL，供下载失败重试使用
+  const lastDownloadUrlRef = useRef<string | null>(null);
 
   // 更新提示弹窗（替代 Android 原生 Alert）
   const [updateDialog, setUpdateDialog] = useState<UpdateDialogConfig | null>(null);
@@ -132,6 +134,7 @@ export default function SettingsScreen() {
 
       if (apkResult.hasUpdate && apkResult.apkDownloadUrl) {
         setApkUpdateAvailable(apkResult);
+        lastDownloadUrlRef.current = apkResult.apkDownloadUrl;
         // APK 优先（原生变更必须整包更新）：弹窗显示 changelog
         setUpdateDialog({
           variant: apkResult.forceUpdate ? "force" : "info",
@@ -147,13 +150,16 @@ export default function SettingsScreen() {
           onCancel: apkResult.forceUpdate ? undefined : () => setUpdateDialog(null),
         });
       } else if (otaUpdated) {
-        // OTA 已下载：UI 会自动显示"重启生效"按钮，弹窗仅作提示
+        // OTA 已下载：弹窗按钮直接重启应用（原"知道了"仅关闭，与文案不符）
         setUpdateDialog({
           variant: "ready",
           title: "更新已就绪",
-          message: "热更新已下载，点击「重启生效」立即应用",
-          confirmText: "知道了",
-          onConfirm: () => setUpdateDialog(null),
+          message: "热更新已下载，点击下方按钮立即重启应用",
+          confirmText: "重启生效",
+          onConfirm: () => {
+            setUpdateDialog(null);
+            Updates.reloadAsync().catch(() => {});
+          },
         });
       } else {
         setUpdateDialog({
@@ -169,13 +175,40 @@ export default function SettingsScreen() {
         variant: "error",
         title: "检查失败",
         message: err?.message || "请稍后重试",
-        confirmText: "好的",
+        confirmText: "关闭",
         onConfirm: () => setUpdateDialog(null),
+        retryText: "重试",
+        onRetry: () => {
+          setUpdateDialog(null);
+          handleCheckUpdate();
+        },
       });
     } finally {
       setChecking(false);
     }
   };
+
+  // 下载失败 → 用 UpdateDialog error 变体提示（替代原生 Alert）
+  useEffect(() => {
+    if (!downloadError) return;
+    setUpdateDialog({
+      variant: "error",
+      title: "下载失败",
+      message: downloadError,
+      confirmText: "关闭",
+      onConfirm: () => {
+        clearDownloadError();
+        setUpdateDialog(null);
+      },
+      retryText: "重试",
+      onRetry: () => {
+        const url = lastDownloadUrlRef.current;
+        clearDownloadError();
+        setUpdateDialog(null);
+        if (url) download(url);
+      },
+    });
+  }, [downloadError]);
 
   const locales = [
     { key: "zh-CN", label: "简体中文" },

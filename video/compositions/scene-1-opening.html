@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+</head>
+<body>
+  <template id="scene-1-template">
+    <div data-composition-id="scene-1" data-width="1920" data-height="1080">
+      <!-- 立绘墙背景：6 列角色立绘铺底 -->
+      <div class="cast-wall">
+        <img
+          crossorigin="anonymous"
+          src="assets/characters/img_full_fuji-miyako_01.webp"
+          alt="藤都子"
+        />
+        <img
+          crossorigin="anonymous"
+          src="assets/characters/img_full_sengoku-yuno_01.webp"
+          alt="千石由乃"
+        />
+        <img
+          crossorigin="anonymous"
+          src="assets/characters/img_full_minetsuki-ritsu_01.webp"
+          alt="峰月律"
+        />
+        <img
+          crossorigin="anonymous"
+          src="assets/characters/img_full_nakamachi-arale_01.webp"
+          alt="仲町阿拉蕾"
+        />
+        <img
+          crossorigin="anonymous"
+          src="assets/characters/img_full_miyanaga-nonoka_01.webp"
+          alt="宫永野乃花"
+        />
+        <img
+          crossorigin="anonymous"
+          src="assets/characters/img_character-main-viola.webp"
+          alt="薇欧拉"
+        />
+      </div>
+
+      <!-- 径向遮罩：聚焦中心、压暗边缘，避免 H.264 banding -->
+      <div class="hero-veil"></div>
+
+      <!-- 内容容器：flex 居中布局 -->
+      <div class="scene-content">
+        <!-- Logo -->
+        <div class="hero-logo">
+          <img src="assets/about-logo.png" alt="YunoSeek Logo" />
+        </div>
+
+        <!-- 标题：每个字母独立 span，错落入场 -->
+        <h1 class="hero-title">
+          <span>Y</span><span>u</span><span>n</span><span>o</span><span>S</span><span>e</span><span>e</span><span>k</span><span style="display:inline-block;width:0.25em"> </span><span>A</span><span>P</span><span>P</span>
+        </h1>
+
+        <!-- 副标题 -->
+        <p class="hero-sub">与梦限大共同呼吸的角色化 AI 聊天应用</p>
+      </div>
+
+      <style>
+        @font-face { font-family: 'PingFang SC'; src: local('PingFang SC'), local('PingFangSC-Regular'); }
+        @font-face { font-family: 'Hiragino Sans GB'; src: local('Hiragino Sans GB'), local('HiraginoSansGB-W3'); }
+        @font-face { font-family: 'Microsoft YaHei'; src: local('Microsoft YaHei'), local('MicrosoftYaHei'); }
+        /* 场景样式，scoped 到 [data-composition-id="scene-1"] */
+        [data-composition-id="scene-1"] {
+          position: relative;
+          width: 1920px;
+          height: 1080px;
+          background: #08080c;
+          overflow: hidden;
+          font-family: "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+        }
+
+        /* 立绘墙：6 列 grid 铺满 */
+        [data-composition-id="scene-1"] .cast-wall {
+          position: absolute;
+          inset: 0;
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          width: 100%;
+          height: 100%;
+          z-index: 0;
+        }
+
+        [data-composition-id="scene-1"] .cast-wall img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: top center;
+          opacity: 0.32;
+          filter: saturate(0.85) contrast(1.05);
+          transform: scale(1.05);
+        }
+
+        /* 径向遮罩：中心透、边缘压暗 */
+        [data-composition-id="scene-1"] .hero-veil {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              ellipse 80% 60% at 50% 55%,
+              rgba(8, 8, 12, 0.45) 0%,
+              rgba(8, 8, 12, 0.88) 70%,
+              rgba(8, 8, 12, 0.98) 100%
+            ),
+            linear-gradient(
+              180deg,
+              rgba(8, 8, 12, 0.6) 0%,
+              rgba(8, 8, 12, 0) 25%,
+              rgba(8, 8, 12, 0) 70%,
+              rgba(8, 8, 12, 0.95) 100%
+            );
+          z-index: 1;
+        }
+
+        /* 内容容器：flex + padding 布局，非绝对定位 */
+        [data-composition-id="scene-1"] .scene-content {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          width: 100%;
+          height: 100%;
+          padding: 120px 160px;
+          gap: 24px;
+          position: relative;
+          z-index: 2;
+          box-sizing: border-box;
+        }
+
+        /* Logo */
+        [data-composition-id="scene-1"] .hero-logo img {
+          width: 140px;
+          height: 140px;
+          object-fit: contain;
+          filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.6))
+            drop-shadow(0 0 48px rgba(238, 85, 119, 0.25));
+        }
+
+        /* 标题 */
+        [data-composition-id="scene-1"] .hero-title {
+          font-size: 120px;
+          font-weight: 800;
+          letter-spacing: -0.04em;
+          color: #fff;
+          text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+          line-height: 1;
+          margin: 0;
+        }
+
+        /* 副标题 */
+        [data-composition-id="scene-1"] .hero-sub {
+          font-size: 22px;
+          color: rgba(246, 244, 248, 0.62);
+          max-width: 560px;
+          text-align: center;
+          margin: 0;
+          line-height: 1.5;
+        }
+      </style>
+
+      <script>
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+
+        // 1. 立绘墙入场：从放大+透明渐入
+        tl.from(".cast-wall", {
+          opacity: 0,
+          scale: 1.1,
+          duration: 0.8,
+          ease: "power2.out",
+        }, 0);
+
+        // 2. 径向遮罩入场
+        tl.from(".hero-veil", {
+          opacity: 0,
+          duration: 0.6,
+          ease: "power1.out",
+        }, 0.1);
+
+        // 3. Logo 入场：上浮 + 缩放
+        tl.from(".hero-logo", {
+          y: 30,
+          opacity: 0,
+          scale: 0.9,
+          duration: 0.64,
+          ease: "power3.out",
+        }, 0.2);
+
+        // 4. 标题字母错落入场
+        tl.from(".hero-title span", {
+          y: 60,
+          opacity: 0,
+          duration: 0.48,
+          ease: "expo.out",
+          stagger: 0.06,
+        }, 0.4);
+
+        // 5. 副标题入场
+        tl.from(".hero-sub", {
+          y: 20,
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.out",
+        }, 0.9);
+
+        // 6. Logo 辉光脉冲：finite repeat（2 次 yoyo，9s 内约 2 循环）
+        tl.to(".hero-logo img", {
+          filter: "drop-shadow(0 12px 40px rgba(0,0,0,.6)) drop-shadow(0 0 64px rgba(238,85,119,.5))",
+          duration: 1.6,
+          ease: "sine.inOut",
+          repeat: 2,
+          yoyo: true,
+        }, 1.5);
+
+        window.__timelines["scene-1"] = tl;
+      </script>
+    </div>
+  </template>
+</body>
+</html>

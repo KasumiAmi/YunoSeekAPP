@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+</head>
+<body>
+  <template id="scene-3-template">
+    <div data-composition-id="scene-3" data-width="1920" data-height="1080" data-start="0" data-duration="10">
+      <!-- 内容容器：flex 居中放置手机框 -->
+      <div class="scene-content">
+        <!-- 手机框 mockup：展示 DeepSeek 风格聊天 UI -->
+        <div class="phone-mockup">
+          <!-- 顶栏：角色头像与名称 -->
+          <div class="chat-topbar">
+            <div class="avatar-dot"></div>
+            <div class="char-meta">
+              <div class="char-name">千石由乃</div>
+              <div class="char-role">DJ / MANIPULATOR</div>
+            </div>
+          </div>
+
+          <!-- 消息区：用户提问 + 思考 + 流式回复 + 搜索结果 -->
+          <div class="chat-messages">
+            <!-- 用户消息 -->
+            <div class="msg-user">介绍一下你自己</div>
+
+            <!-- 思考徽章：旋转图标 + 文本 -->
+            <div class="think-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="9" stroke="#EE5577" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="42 14" />
+              </svg>
+              <span>深度思考中…</span>
+            </div>
+
+            <!-- 助手消息：逐字流式揭示 -->
+            <div class="msg-assistant">我是千石由乃，梦限大 MewType 的 DJ 兼 Manipulator。虽然看起来懒散，但对音乐格外认真。节能主义是我的信条，不过关键时刻我会帮大家理清心结。</div>
+
+            <!-- 搜索徽章：搜索图标 + 结果数 -->
+            <div class="search-badge">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+                <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              <span>已搜索 6 条结果</span>
+            </div>
+          </div>
+
+          <!-- 底部输入框：装饰性绝对定位 -->
+          <div class="composer">
+            <div class="composer-input"></div>
+            <div class="send-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 12L19 12M19 12L13 6M19 12L13 18" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style>
+        @font-face { font-family: 'PingFang SC'; src: local('PingFang SC'), local('PingFangSC-Regular'); }
+        @font-face { font-family: 'Hiragino Sans GB'; src: local('Hiragino Sans GB'), local('HiraginoSansGB-W3'); }
+        @font-face { font-family: 'Microsoft YaHei'; src: local('Microsoft YaHei'), local('MicrosoftYaHei'); }
+        /* 场景样式，scoped 到 [data-composition-id="scene-3"] */
+        [data-composition-id="scene-3"] {
+          position: relative;
+          width: 1920px;
+          height: 1080px;
+          background: #08080c;
+          overflow: hidden;
+          font-family: "Inter", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+        }
+
+        /* 内容容器：flex 居中手机框 */
+        [data-composition-id="scene-3"] .scene-content {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          position: relative;
+          z-index: 2;
+          box-sizing: border-box;
+        }
+
+        /* 手机框 mockup */
+        [data-composition-id="scene-3"] .phone-mockup {
+          width: 540px;
+          height: 960px;
+          border-radius: 40px;
+          background: #0f0f16;
+          border: 1px solid rgba(255, 255, 255, .08);
+          overflow: hidden;
+          position: relative;
+          margin: 0 auto;
+          box-shadow: 0 40px 80px rgba(0, 0, 0, .5), 0 0 60px rgba(238, 85, 119, .15);
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* 顶栏：角色头像 + 名称 + 角色 */
+        [data-composition-id="scene-3"] .chat-topbar {
+          padding: 20px 24px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          border-bottom: 1px solid rgba(255, 255, 255, .08);
+          background: rgba(238, 85, 119, .08);
+          backdrop-filter: blur(20px);
+          flex-shrink: 0;
+        }
+
+        /* 角色头像占位 */
+        [data-composition-id="scene-3"] .avatar-dot {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #EE5577;
+          box-shadow: 0 0 12px rgba(238, 85, 119, .45);
+          flex-shrink: 0;
+        }
+
+        /* 名称 + 角色垂直堆叠 */
+        [data-composition-id="scene-3"] .char-meta {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        [data-composition-id="scene-3"] .char-name {
+          font-size: 16px;
+          font-weight: 600;
+          color: #f6f4f8;
+        }
+
+        [data-composition-id="scene-3"] .char-role {
+          font-size: 12px;
+          color: rgba(246, 244, 248, .4);
+        }
+
+        /* 消息区 */
+        [data-composition-id="scene-3"] .chat-messages {
+          padding: 24px;
+          flex: 1;
+          overflow: hidden;
+        }
+
+        /* 用户消息 */
+        [data-composition-id="scene-3"] .msg-user {
+          font-size: 15px;
+          color: rgba(246, 244, 248, .62);
+          margin-bottom: 20px;
+        }
+
+        /* 思考徽章 */
+        [data-composition-id="scene-3"] .think-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px;
+          border-radius: 999px;
+          background: rgba(238, 85, 119, .14);
+          border: 1px solid rgba(238, 85, 119, .35);
+          font-size: 12px;
+          color: #EE5577;
+          margin-bottom: 16px;
+        }
+
+        /* 助手消息 */
+        [data-composition-id="scene-3"] .msg-assistant {
+          font-size: 16px;
+          line-height: 1.7;
+          color: #f6f4f8;
+        }
+
+        /* 搜索徽章 */
+        [data-composition-id="scene-3"] .search-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 14px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, .04);
+          border: 1px solid rgba(255, 255, 255, .08);
+          font-size: 12px;
+          color: rgba(246, 244, 248, .62);
+          margin-top: 16px;
+        }
+
+        /* 底部输入框：绝对定位，装饰性 */
+        [data-composition-id="scene-3"] .composer {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 16px 24px;
+          background: rgba(15, 15, 22, .92);
+          border-top: 1px solid rgba(255, 255, 255, .08);
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        /* 输入框占位 */
+        [data-composition-id="scene-3"] .composer-input {
+          flex: 1;
+          height: 40px;
+          border-radius: 20px;
+          background: rgba(255, 255, 255, .06);
+          border: 1px solid rgba(255, 255, 255, .08);
+        }
+
+        /* 发送按钮 */
+        [data-composition-id="scene-3"] .send-btn {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: #EE5577;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+      </style>
+
+      <script>
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+
+        // 1. 手机框入场：上浮 + 缩放 + 渐显
+        tl.from(".phone-mockup", {
+          y: 40,
+          opacity: 0,
+          scale: 0.96,
+          duration: 0.6,
+          ease: "expo.out",
+        }, 0.2);
+
+        // 2. 顶栏入场：下滑 + 渐显
+        tl.from(".chat-topbar", {
+          y: -20,
+          opacity: 0,
+          duration: 0.4,
+          ease: "power2.out",
+        }, 0.5);
+
+        // 3. 用户消息入场：左滑 + 渐显
+        tl.from(".msg-user", {
+          x: -20,
+          opacity: 0,
+          duration: 0.4,
+          ease: "power2.out",
+        }, 0.8);
+
+        // 4. 思考徽章入场：上浮 + 渐显
+        tl.from(".think-badge", {
+          y: 15,
+          opacity: 0,
+          duration: 0.4,
+          ease: "power3.out",
+        }, 1.1);
+
+        // 9. 思考图标旋转（finite，repeat:2）
+        tl.to(".think-badge svg", {
+          rotation: 360,
+          duration: 1,
+          ease: "none",
+          repeat: 2,
+          transformOrigin: "50% 50%",
+        }, 1.1);
+
+        // 5. 思考徽章折叠：状态变化，opacity 降到 0.3 保持可见
+        tl.to(".think-badge", {
+          opacity: 0.3,
+          scale: 0.95,
+          duration: 0.3,
+          ease: "power2.in",
+        }, 2.2);
+
+        // 6. 助手消息逐字流式揭示：clip-path 从左到右展开（模拟 SSE 流式）
+        tl.set(".msg-assistant", {
+          clipPath: "inset(0 100% 0 0)",
+        }, 2.4);
+        tl.to(".msg-assistant", {
+          clipPath: "inset(0 0% 0 0)",
+          duration: 4,
+          ease: "none",
+        }, 2.5);
+
+        // 7. 搜索徽章入场：上浮 + 回弹
+        tl.from(".search-badge", {
+          y: 15,
+          opacity: 0,
+          duration: 0.4,
+          ease: "back.out(1.4)",
+        }, 5.5);
+
+        // 8. 底部输入框入场：上浮 + 渐显
+        tl.from(".composer", {
+          y: 30,
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.out",
+        }, 0.6);
+
+        window.__timelines["scene-3"] = tl;
+      </script>
+    </div>
+  </template>
+</body>
+</html>

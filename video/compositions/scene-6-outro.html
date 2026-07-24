@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+</head>
+<body>
+  <template id="scene-6-template">
+    <div data-composition-id="scene-6" data-width="1920" data-height="1080">
+      <!-- 收尾辉光层：径向粉色辉光，柔化中央焦点 -->
+      <div class="outro-glow"></div>
+
+      <!-- 内容容器（fade-to-black 目标） -->
+      <div class="scene-6-content">
+        <!-- Logo -->
+        <img class="outro-logo" src="assets/about-logo.png" alt="YunoSeek Logo" />
+
+        <!-- 版本徽章 -->
+        <div class="version-badge">
+          <span class="badge-dot"></span>
+          v1.0.1_0723 · 最新版本
+        </div>
+
+        <!-- 下载卡网格：3 个 ABI 包 -->
+        <div class="download-grid">
+          <div class="download-card">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <div class="card-abi">arm64-v8a / 推荐</div>
+            <div class="card-size">约 51.7 MB</div>
+          </div>
+          <div class="download-card">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <div class="card-abi">armeabi-v7a / 旧设备</div>
+            <div class="card-size">约 44.9 MB</div>
+          </div>
+          <div class="download-card">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <div class="card-abi">x86_64 / 模拟器</div>
+            <div class="card-size">约 53.1 MB</div>
+          </div>
+        </div>
+
+        <!-- B站作者区 -->
+        <div class="author-row">
+          <img class="author-avatar" src="assets/author.jpg" alt="滴椎Yuno酱" />
+          <div class="author-name">滴椎Yuno酱 · 哔哩哔哩主页</div>
+        </div>
+
+        <!-- 版权声明（white-space: pre-line 自然换行，避免 <br>） -->
+        <p class="copyright">© 2026 YunoSeek · MIT License
+BanG Dream! 所有权为 Bushiroad 所有</p>
+      </div>
+
+      <style>
+        @font-face { font-family: 'PingFang SC'; src: local('PingFang SC'), local('PingFangSC-Regular'); }
+        @font-face { font-family: 'Hiragino Sans GB'; src: local('Hiragino Sans GB'), local('HiraginoSansGB-W3'); }
+        @font-face { font-family: 'Microsoft YaHei'; src: local('Microsoft YaHei'), local('MicrosoftYaHei'); }
+        /* ===== 场景 6：收尾下载 — 局部样式 ===== */
+        [data-composition-id="scene-6"] {
+          position: relative;
+          width: 1920px;
+          height: 1080px;
+          background: #08080c;
+          font-family: "Inter", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+          overflow: hidden;
+        }
+
+        /* 收尾辉光层：中央径向粉色辉光 */
+        [data-composition-id="scene-6"] .outro-glow {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(circle at 50% 45%, rgba(238, 85, 119, .18) 0%, rgba(238, 85, 119, 0) 55%);
+          z-index: 1;
+        }
+
+        /* 内容容器：flex + padding 布局（非绝对定位），fade-to-black 目标 */
+        [data-composition-id="scene-6"] .scene-6-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          width: 100%;
+          height: 100%;
+          padding: 100px 160px;
+          gap: 32px;
+          box-sizing: border-box;
+          position: relative;
+          z-index: 2;
+        }
+
+        /* Logo */
+        [data-composition-id="scene-6"] .outro-logo {
+          width: 180px;
+          height: 180px;
+          object-fit: contain;
+          filter: drop-shadow(0 12px 40px rgba(0, 0, 0, .6))
+                  drop-shadow(0 0 64px rgba(238, 85, 119, .3));
+        }
+
+        /* 版本徽章 */
+        [data-composition-id="scene-6"] .version-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 18px;
+          border-radius: 999px;
+          background: rgba(238, 85, 119, .14);
+          border: 1px solid rgba(238, 85, 119, .35);
+          color: #FFC4D1;
+          font-size: 14px;
+          font-weight: 600;
+          letter-spacing: .06em;
+        }
+        [data-composition-id="scene-6"] .badge-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #EE5577;
+          box-shadow: 0 0 8px rgba(238, 85, 119, .45);
+        }
+
+        /* 下载卡网格 */
+        [data-composition-id="scene-6"] .download-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+          max-width: 880px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        [data-composition-id="scene-6"] .download-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          padding: 32px 20px;
+          border: 1px solid rgba(255, 255, 255, .08);
+          border-radius: 18px;
+          background: rgba(255, 255, 255, .02);
+          text-align: center;
+          box-sizing: border-box;
+        }
+        [data-composition-id="scene-6"] .card-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(238, 85, 119, .14);
+          color: #EE5577;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 8px;
+        }
+        [data-composition-id="scene-6"] .card-abi {
+          font-size: 15px;
+          letter-spacing: .06em;
+          color: rgba(246, 244, 248, .62);
+        }
+        [data-composition-id="scene-6"] .card-size {
+          font-size: 13px;
+          color: rgba(246, 244, 248, .65);
+        }
+
+        /* B站作者区 */
+        [data-composition-id="scene-6"] .author-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 16px;
+        }
+        [data-composition-id="scene-6"] .author-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 1px solid rgba(255, 255, 255, .08);
+        }
+        [data-composition-id="scene-6"] .author-name {
+          font-size: 15px;
+          color: rgba(246, 244, 248, .62);
+        }
+
+        /* 版权声明 */
+        [data-composition-id="scene-6"] .copyright {
+          font-size: 13px;
+          color: rgba(246, 244, 248, .65);
+          text-align: center;
+          line-height: 1.6;
+          margin: 8px 0 0 0;
+          white-space: pre-line;
+        }
+      </style>
+
+      <script>
+        // ===== 场景 6 时间线：收尾下载（入场 + 末尾 fade-to-black，唯一允许的 exit） =====
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+
+        // 1. Logo 入场：缩放 + 渐显
+        tl.from(".outro-logo", { scale: 0.85, opacity: 0, duration: 0.7, ease: "expo.out" }, 0.2);
+
+        // 2. 版本徽章入场：上浮
+        tl.from(".version-badge", { y: 20, opacity: 0, duration: 0.5, ease: "power2.out" }, 0.8);
+
+        // 3. 下载卡 stagger 入场
+        tl.from(".download-card", { y: 30, opacity: 0, duration: 0.45, ease: "power3.out", stagger: 0.12 }, 1.0);
+
+        // 4. B站作者区入场
+        tl.from(".author-row", { y: 20, opacity: 0, duration: 0.4, ease: "power2.out" }, 1.6);
+
+        // 5. 版权声明入场
+        tl.from(".copyright", { y: 15, opacity: 0, duration: 0.4, ease: "power2.out" }, 1.8);
+
+        // 6. Logo 辉光脉冲：finite repeat 3 次 yoyo（11s 内约 3 次循环）
+        tl.to(".outro-logo", {
+          filter: "drop-shadow(0 12px 40px rgba(0,0,0,.6)) drop-shadow(0 0 96px rgba(238,85,119,.55))",
+          duration: 1.6,
+          ease: "sine.inOut",
+          repeat: 3,
+          yoyo: true,
+        }, 2.0);
+
+        // 7. 末尾 fade-to-black：场景 6 唯一允许的 exit 动画
+        tl.to(".scene-6-content", { opacity: 0, duration: 0.6, ease: "power2.in" }, 10.2);
+
+        window.__timelines["scene-6"] = tl;
+      </script>
+    </div>
+  </template>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // 更新弹窗：替代 Android 原生 Alert，统一应用内更新提示视觉风格
 // 支持四种 variant：info（发现新版本）/ force（必须更新）/ ready（更新就绪）/ latest（已是最新）/ error（检查失败）
 // 由 app/index.tsx（启动自动弹）和 app/settings.tsx（手动检查）共用
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   View,
@@ -18,7 +18,6 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withDelay,
-  withSequence,
   Easing,
   runOnJS,
 } from "react-native-reanimated";
@@ -44,6 +43,9 @@ export interface UpdateDialogConfig {
   cancelText?: string;
   onConfirm?: () => void;
   onCancel?: () => void;
+  // error 变体可选的重试按钮（与 cancel/confirm 并列）
+  retryText?: string;
+  onRetry?: () => void;
 }
 
 interface Props {
@@ -55,6 +57,7 @@ interface Props {
 
 const ANIM_IN = 480;
 const ANIM_IN_DELAY = 80;
+const ANIM_OUT = 280;
 
 export function UpdateDialog({ visible, config, onRequestClose }: Props) {
   const systemScheme = useColorScheme();
@@ -63,17 +66,26 @@ export function UpdateDialog({ visible, config, onRequestClose }: Props) {
   const mode = resolveThemeMode(themeMode, systemScheme);
   const theme = getTheme(mode, profile.themeColor);
 
-  // 入场动画进度（0 = 隐藏，1 = 完全显示）
+  // 入场/退场动画进度（0 = 隐藏，1 = 完全显示）
   const progress = useSharedValue(0);
+  // 实际渲染开关：滞后 visible 关闭，等退出动画跑完再卸载
+  const [render, setRender] = useState(false);
   useEffect(() => {
     if (visible) {
+      setRender(true);
       progress.value = 0;
       progress.value = withDelay(
         ANIM_IN_DELAY,
         withTiming(1, { duration: ANIM_IN, easing: Easing.bezier(0.22, 1, 0.36, 1) })
       );
-    } else {
-      progress.value = 0;
+    } else if (render) {
+      // 退出：反向淡出 + 轻微下沉，避免瞬间消失
+      progress.value = withTiming(0, {
+        duration: ANIM_OUT,
+        easing: Easing.in(Easing.ease),
+      }, () => {
+        runOnJS(setRender)(false);
+      });
     }
   }, [visible]);
 
@@ -109,7 +121,7 @@ export function UpdateDialog({ visible, config, onRequestClose }: Props) {
     };
   });
 
-  if (!visible || !config) return null;
+  if (!render || !config) return null;
 
   const isForce = config.variant === "force";
   const canDismiss = !isForce;
@@ -258,6 +270,24 @@ export function UpdateDialog({ visible, config, onRequestClose }: Props) {
                 </Text>
               </TouchableOpacity>
             )}
+            {config.onRetry ? (
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  styles.btnSecondary,
+                  {
+                    backgroundColor: `rgba(${meta.accentRgb},0.14)`,
+                    borderColor: `rgba(${meta.accentRgb},0.35)`,
+                  },
+                ]}
+                onPress={config.onRetry}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.btnText, { color: meta.accent, fontWeight: "600" }]}>
+                  {config.retryText ?? "重试"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             {config.onConfirm ? (
               <TouchableOpacity
                 style={[

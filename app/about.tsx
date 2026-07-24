@@ -41,7 +41,7 @@ export default function AboutScreen() {
   const theme = getTheme(mode, profile.themeColor);
 
   // 版本号：app.json 中的 version
-  const appVersion = Constants.expoConfig?.version ?? "1.0.1_0723";
+  const appVersion = Constants.expoConfig?.version ?? "1.0.2_0724";
   // 构建时间：由 scripts/gen-build-info.js 在构建前写入 lib/build-info.ts
   // 直接内联到 bundle，不依赖环境变量或 expo-updates（release 模式下不可靠）
   const buildTimeStr = BUILD_TIME > 0
