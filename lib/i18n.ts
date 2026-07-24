@@ -35,6 +35,7 @@ const dict: Record<string, Record<Locale, string>> = {
   handoffRotate: { "zh-CN": "更换引继码", "zh-HK": "更換引繼碼", "zh-TW": "更換引繼碼", "ja-JP": "コード更新" },
   announcement: { "zh-CN": "公告", "zh-HK": "公告", "zh-TW": "公告", "ja-JP": "お知らせ" },
   announcementUpdated: { "zh-CN": "更新于 {time}", "zh-HK": "更新於 {time}", "zh-TW": "更新於 {time}", "ja-JP": "更新: {time}" },
+  announcementNew: { "zh-CN": "新公告", "zh-HK": "新公告", "zh-TW": "新公告", "ja-JP": "新着" },
   profile: { "zh-CN": "角色资料", "zh-HK": "角色資料", "zh-TW": "角色資料", "ja-JP": "キャラクター" },
   searchResults: { "zh-CN": "搜索结果", "zh-HK": "搜索結果", "zh-TW": "搜尋結果", "ja-JP": "検索結果" },
   noConversations: { "zh-CN": "暂无对话", "zh-HK": "暫無對話", "zh-TW": "暫無對話", "ja-JP": "会話がありません" },
