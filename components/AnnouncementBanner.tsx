@@ -185,9 +185,6 @@ export function AnnouncementBanner() {
         style={styles.banner}
         onPress={openDetail}
         activeOpacity={0.7}
-        accessible
-        accessibilityLabel={t("announcement")}
-        accessibilityRole="button"
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
           <View style={{ position: "relative", marginRight: 8 }}>
