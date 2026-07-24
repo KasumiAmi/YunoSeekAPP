@@ -263,6 +263,32 @@ export interface Conversation {
   updatedAt: number;
 }
 
+// 公告条目（与服务端 /api/announcement 返回结构一致）
+export interface AnnouncementItem {
+  id?: string;
+  title?: string;
+  content?: string;
+  level?: string;
+  updatedAt?: number;
+}
+
+/**
+ * 计算公告集合的 identity 字符串，用于未读比对。
+ * 对齐 web 端 siteAnnouncementIdentity：任一条目的 id/title/content/level/updatedAt
+ * 变化，或条目数量/顺序变化，都会产生不同的 identity。
+ */
+export function announcementIdentity(items: AnnouncementItem[]): string {
+  return JSON.stringify(
+    items.map((it) => ({
+      id: it.id,
+      title: it.title,
+      content: it.content,
+      level: it.level,
+      updatedAt: it.updatedAt,
+    }))
+  );
+}
+
 interface State {
   // 对话
   conversations: Conversation[];
@@ -286,6 +312,10 @@ interface State {
   // 本地统计
   totalTokensUsed: number;
   handoffToken: string;
+  // 公告
+  announcementItems: AnnouncementItem[];            // 运行时数据，不持久化
+  announcementSeenIdentity: string;                 // 持久化：上次已读的 identity
+  announcementLastFetchAt: number;                  // 运行时：上次成功 fetch 时间戳
 
   // 更新状态（运行时，不持久化）
   apkUpdateAvailable: ApkUpdateInfo | null;
@@ -319,6 +349,8 @@ interface State {
   mergeConversations: (rawServerConversations: unknown) => void;
   setApkUpdateAvailable: (info: ApkUpdateInfo | null) => void;
   setOtaUpdateReady: (ready: boolean) => void;
+  setAnnouncementItems: (items: AnnouncementItem[]) => void;
+  markAnnouncementRead: (identity: string) => void;
   getActiveConversation: () => Conversation | undefined;
   getCurrentProfile: () => Profile;
 }
@@ -373,6 +405,9 @@ export const useStore = create<State>()(
       handoffToken: "",
       apkUpdateAvailable: null,
       otaUpdateReady: false,
+      announcementItems: [],
+      announcementSeenIdentity: "",
+      announcementLastFetchAt: 0,
 
       setActiveConversation: (id) => {
         if (id === null) {
@@ -527,6 +562,17 @@ export const useStore = create<State>()(
         const s = get();
         return profiles.find((p) => p.key === s.currentProfileKey) || profiles[0];
       },
+
+      setAnnouncementItems: (items) =>
+        set({
+          announcementItems: items,
+          announcementLastFetchAt: Date.now(),
+        }),
+
+      markAnnouncementRead: (identity) => {
+        if (!identity) return;
+        set({ announcementSeenIdentity: identity });
+      },
     }),
     {
       name: "yunoseek-store",
@@ -571,7 +617,14 @@ export const useStore = create<State>()(
         customProvider: state.customProvider,
         totalTokensUsed: state.totalTokensUsed,
         handoffToken: state.handoffToken,
+        announcementSeenIdentity: state.announcementSeenIdentity,
       }),
     }
   )
 );
+
+// 派生 selector：公告是否有未读。
+// items 为空时恒为 false；否则比对当前 identity 与已记录的 seenIdentity。
+export const selectAnnouncementUnread = (s: State): boolean =>
+  s.announcementItems.length > 0 &&
+  announcementIdentity(s.announcementItems) !== s.announcementSeenIdentity;
