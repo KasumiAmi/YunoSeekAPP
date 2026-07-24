@@ -21,6 +21,7 @@
     },
     "android": {
       "package": "asia.ownbangdream.yunoseek",
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/adaptive-icon.png",
