@@ -22,19 +22,11 @@ import Animated, {
   runOnJS,
   type SharedValue,
 } from "react-native-reanimated";
-import { useStore } from "../lib/store";
+import { useStore, selectAnnouncementUnread, announcementIdentity, type AnnouncementItem } from "../lib/store";
 import { getTheme, resolveThemeMode } from "../lib/theme";
 import { t } from "../lib/i18n";
-import { announcement } from "../lib/api";
+import { useAnnouncement } from "../lib/use-announcement";
 import { HtmlRenderer } from "./HtmlRenderer";
-
-interface AnnouncementItem {
-  id?: string;
-  title?: string;
-  content?: string;
-  level?: string;
-  updatedAt?: number;
-}
 
 const ROTATION_MS = 5000;
 const ANIM_MS = 640;
@@ -96,24 +88,26 @@ export function AnnouncementBanner() {
   const mode = resolveThemeMode(themeMode, systemScheme);
   const theme = getTheme(mode, profile.themeColor);
 
-  const [items, setItems] = useState<AnnouncementItem[]>([]);
   const [dismissed, setDismissed] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [appActive, setAppActive] = useState(true);
   const locale = useStore((s) => s.locale);
 
+  // 公告数据从 store 订阅；useAnnouncement 启动 40s 轮询 + 前台刷新
+  const items = useStore((s) => s.announcementItems);
+  const unread = useStore(selectAnnouncementUnread);
+  useAnnouncement();
+
   // 轮播连续浮点索引（始终向前递增，避免 wrap-around 反向动画）
   const animatedIndex = useSharedValue(0);
 
-  useEffect(() => {
-    announcement()
-      .then((res) => {
-        const list = res?.announcements || (res ? [res] : []);
-        if (list.length > 0) setItems(list);
-      })
-      .catch(() => {});
-  }, []);
+  // 打开详情 Modal 时立即标记已读（对齐 web openAnnouncementDialog → markSiteAnnouncementRead）
+  const openDetail = () => {
+    setDetailVisible(true);
+    const identity = announcementIdentity(items);
+    if (identity) useStore.getState().markAnnouncementRead(identity);
+  };
 
   const displayList = items.slice(0, MAX_VISIBLE);
   const showRotation = displayList.length > 1;
@@ -153,7 +147,7 @@ export function AnnouncementBanner() {
       {/* 横幅（透明背景，与顶栏共享模糊/实色层，视觉一体化） */}
       <TouchableOpacity
         style={styles.banner}
-        onPress={() => setDetailVisible(true)}
+        onPress={openDetail}
         activeOpacity={0.7}
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
