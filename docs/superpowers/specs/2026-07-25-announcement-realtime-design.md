@@ -16,7 +16,7 @@
 
 ## 目标
 
-- 公告更新在 30 秒内被客户端感知（对齐 web 轮询间隔）。
+- 公告更新在 40 秒内被客户端感知（用户指定间隔，略低于 web 的 30s 以减负）。
 - App 切回前台立即刷新（对齐 web visibilitychange）。
 - 未读状态持久化到 AsyncStorage，跨重启保留。
 - 视觉上明确标识"有新公告"，符合用户偏好的辉光特效 + 重点阴影风格。
@@ -47,7 +47,7 @@
 ```
 use-announcement hook (mount)
   ├─ 立即触发首次拉取（保留现有 mount 即拉的行为）
-  ├─ 递归 setTimeout 30s → fetchAndApply()（避免重叠，对齐 handoff 模式）
+  ├─ 递归 setTimeout 40s → fetchAndApply()（避免重叠，对齐 handoff 模式）
   └─ AppState "active" → fetchAndApply()
          │
          ├─ 并发去重：inFlightRef（仿 web siteAnnouncementLoadPromise）
@@ -169,13 +169,13 @@ export function announcementIdentity(items: AnnouncementItem[]): string {
   })));
 }
 
-const POLL_INTERVAL_MS = 30_000;  // 对齐 web
+const POLL_INTERVAL_MS = 40_000;  // 用户指定，略低于 web 的 30s
 
 export function useAnnouncement(): void {
   const inFlightRef = useRef<Promise<void> | null>(null);
 
   const fetchAndApply = async () => {
-    // 并发去重：30s 间隔与 AppState 触发可能重叠
+    // 并发去重：40s 间隔与 AppState 触发可能重叠
     if (inFlightRef.current) return inFlightRef.current;
     const p = (async () => {
       try {
@@ -225,7 +225,7 @@ export function useAnnouncement(): void {
 ```
 
 关键点：
-- **结构镜像 handoff 同步**（[app/_layout.tsx](file:///c:/Users/Toyama%20Kasumi/Desktop/%20YunoSeekAPP/app/_layout.tsx) 142-192），但间隔为 30s（对齐 web）。
+- **结构镜像 handoff 同步**（[app/_layout.tsx](file:///c:/Users/Toyama%20Kasumi/Desktop/%20YunoSeekAPP/app/_layout.tsx) 142-192），但间隔为 40s（用户指定）。
 - **inFlightRef 并发去重**：仿 web `siteAnnouncementLoadPromise`。
 - **直接读 `useStore.getState()`**：避免在 effect 闭包里订阅 store，effect 只跑一次。
 - **不返回数据**：组件通过 `useStore` selector 订阅，hook 只负责启动轮询。
@@ -402,9 +402,9 @@ announcementNew: {
 
 - **App 启动时 hydration 未完成**：`AnnouncementBanner` 是 `app/index.tsx` 的子组件，而 `index.tsx` 在 `app/_layout.tsx` hydration 完成后才 mount（[app/_layout.tsx](file:///c:/Users/Toyama%20Kasumi/Desktop/%20YunoSeekAPP/app/_layout.tsx) 196-198 行 `if (!hydrated) return null`）。因此 hook 启动时 `announcementSeenIdentity` 已是持久化值，不会误判为 unread。
 - **服务端公告被清空**：list.length === 0 时跳过 setAnnouncementItems，banner 保持上次的内容。这是有意的——避免服务端临时故障导致用户看到空 banner。下次服务端恢复后会自动更新。
-- **30s 间隔与 AppState 同时触发**：inFlightRef 去重，只发一次请求。
+- **40s 间隔与 AppState 同时触发**：inFlightRef 去重，只发一次请求。
 - **用户在详情 Modal 打开期间服务端更新公告**：轮询继续运行，新公告进入 items，Modal 内 ScrollView 会因 items 变化重新渲染。markRead 已在打开时触发，所以 unread 仍为 false。用户关闭再打开不会重新触发 unread（identity 已记录）。**注意**：如果用户在 Modal 打开期间服务端更新，identity 变化但 seenIdentity 是旧的，unread 会变 true——这是合理行为，用户关闭 Modal 后再次打开会 markRead 新 identity。
-- **App 长期后台**：递归 setTimeout 仍在跑，但回调内检查 `AppState.currentState === "active"`，非活跃时跳过 fetch（仿 web visibilitychange 守卫）。回前台时由 AppState "active" 监听立即触发一次 fetch，无需等下一个 30s。
+- **App 长期后台**：递归 setTimeout 仍在跑，但回调内检查 `AppState.currentState === "active"`，非活跃时跳过 fetch（仿 web visibilitychange 守卫）。回前台时由 AppState "active" 监听立即触发一次 fetch，无需等下一个 40s。
 
 ## 测试
 
@@ -424,17 +424,17 @@ announcementNew: {
 ### 集成测试（手动）
 
 1. 启动 app，观察 banner 首次拉取（应立即显示，无延迟）。
-2. 服务端修改公告内容，30s 内 banner 出现脉冲圆点 + 辉光。
+2. 服务端修改公告内容，40s 内 banner 出现脉冲圆点 + 辉光。
 3. App 切后台 10s，服务端修改公告，App 切回前台，banner 立即出现未读指示。
 4. 打开详情 Modal，脉冲圆点 + 辉光立即消失（unread → false）。
 5. Kill app 重启，banner 不再显示未读指示（seenIdentity 已持久化）。
 6. 服务端再次修改公告，banner 重新出现未读指示。
-7. 点击 X 关闭 banner，30s 后服务端更新公告 → banner 以紧凑模式重新出现。
+7. 点击 X 关闭 banner，40s 后服务端更新公告 → banner 以紧凑模式重新出现。
 8. 网络断开时，banner 保持上次内容，无报错。
 
 ## 性能影响
 
-- 30s 一次 `GET /api/announcement`，响应体通常 < 5KB，对流量/电量影响可忽略。
+- 40s 一次 `GET /api/announcement`，响应体通常 < 5KB，对流量/电量影响可忽略。
 - inFlightRef 去重避免重复请求。
 - AppState 非 active 时跳过轮询，省电。
 - 派生 selector `selectAnnouncementUnread` 仅在 items 或 seenIdentity 变化时重算，O(n) where n = 公告数（通常 < 10）。
