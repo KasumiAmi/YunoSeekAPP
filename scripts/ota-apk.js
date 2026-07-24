@@ -680,10 +680,12 @@ export async function handleApkDownload(req, res) {
       return;
     }
 
-    // 磁盘缓存路径：{abi}-{publishedAt}.apk
-    // publishedAt 格式：2026-07-23T10:00:00Z → 20260723
-    const publishedDate = (release.published_at || "").split("T")[0].replace(/-/g, "");
-    const cacheFileName = `${abi}-${publishedDate}.apk`;
+    // 磁盘缓存路径：{abi}-{versionCode}.apk
+    // 用 versionCode 而非 publishedAt：同一天发布多个版本时 publishedDate 相同会缓存冲突，
+    // versionCode 单调递增且每个版本唯一，保证新版本一定下载新包。
+    const latestVersionCode = parseVersionCode(release.body);
+    const cacheKey = latestVersionCode || release.tag_name || (release.published_at || "").split("T")[0].replace(/-/g, "");
+    const cacheFileName = `${abi}-${cacheKey}.apk`;
     const cacheFilePath = path.join(APK_CACHE_DIR, cacheFileName);
 
     // 确保缓存目录存在
