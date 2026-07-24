@@ -32,17 +32,20 @@ const GITHUB_REPO = process.env.GITHUB_REPO || "";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 
 // 镜像列表（前缀代理型，空字符串 = 直连 GitHub，始终作为最后 fallback）
+// 注意：ghproxy 系镜像域名经常失效，2026-07 实测仅 gh-proxy.com 可用。
+// 下载采用并发探测：同时向多个镜像发请求，谁先返回 200 响应头就用谁，其余取消。
+// 这避免了"卡在死镜像上等 30s 超时"的问题。
 const DEFAULT_MIRRORS = [
-  "https://ghproxy.com",
-  "https://ghproxy.net",
   "https://gh-proxy.com",
-  "https://ghproxy.homeboyc.cn",
+  "https://ghfast.top",
+  "https://ghproxy.net",
+  "", // 直连 GitHub（公开 release asset 直连通常可达）
 ];
 const MIRRORS = (process.env.GITHUB_MIRRORS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
-const FALLBACK_ORDER = MIRRORS.length > 0 ? [...MIRRORS, ""] : [...DEFAULT_MIRRORS, ""];
+const FALLBACK_ORDER = MIRRORS.length > 0 ? [...MIRRORS, ""] : [...DEFAULT_MIRRORS];
 
 // 缓存最近成功的镜像（优先复用，减少探测开销）
 let preferredMirror = null;
@@ -155,54 +158,218 @@ async function githubGetWithMirrors(githubUrl, headers = {}) {
 }
 
 /**
- * 流式下载文件到磁盘（支持镜像 fallback + 重定向 + 健壮的超时）
+ * 流式下载文件到磁盘（并发探测多个镜像，谁先返回 200 就用谁）
  * @param {string} githubUrl 原始 GitHub URL
  * @param {string} destPath 目标文件路径
  * @param {object} headers 请求头
  *
- * 关键修复：
- *   - 流式响应中途停滞/断开时，旧代码依赖 req.on('error') 但 error 实际走 res.on('error')，
- *     导致 Promise 永不 reject、镜像 fallback 永不触发（表现为"卡住不动"）。
- *   - 现在 req / res / ws 三个 error 通道都 reject，且数据停滞有独立 watchdog。
+ * 策略：
+ *   - 串行 fallback 的问题：死镜像要等 30s 超时才换下一个，4 个镜像最坏 120s。
+ *   - 并发探测：同时向所有候选镜像发请求，谁先返回 200 响应头就接管下载，其余立即取消。
+ *   - 首选镜像（上次成功的）仍优先：如果它在 5s 内返回响应头，直接用，不并发其他镜像。
+ *   - 首选 5s 内没响应才触发并发探测，避免每次都打多个镜像。
  */
 async function downloadToFileWithMirrors(githubUrl, destPath, headers = {}) {
-  const order = [];
-  if (preferredMirror !== null) order.push(preferredMirror);
+  // 候选列表：首选在前（如有），去重
+  const candidates = [];
+  if (preferredMirror !== null) candidates.push(preferredMirror);
   for (const m of FALLBACK_ORDER) {
-    if (!order.includes(m)) order.push(m);
+    if (!candidates.includes(m)) candidates.push(m);
   }
 
-  let lastErr;
-  for (const mirror of order) {
-    const tryUrl = buildMirrorUrl(githubUrl, mirror);
+  // 快速路径：首选镜像 5s 内能返回响应头就直接用，不并发其他镜像
+  if (preferredMirror !== null) {
     try {
-      await downloadToFile(tryUrl, destPath, headers);
-      if (preferredMirror !== mirror) {
-        console.log(`[ota-apk] 下载镜像: ${mirror || "直连"}`);
-        preferredMirror = mirror;
-      }
-      return;
+      await downloadToFile(buildMirrorUrl(githubUrl, preferredMirror), destPath, headers, 5, 5000);
+      return; // 成功，无需并发
     } catch (e) {
-      lastErr = e;
-      console.warn(`[ota-apk] 镜像 ${mirror || "直连"} 失败: ${e.message}`);
-      // 失败后清除该镜像的"首选"缓存，强制下次重新探测
-      if (preferredMirror === mirror) preferredMirror = null;
-      // 删除可能的部分文件
+      console.warn(`[ota-apk] 首选镜像 ${preferredMirror || "直连"} 失败: ${e.message}，启动并发探测`);
+      preferredMirror = null;
       try { fs.unlinkSync(destPath); } catch {}
     }
   }
-  throw lastErr || new Error("所有镜像下载均失败");
+
+  // 并发探测：所有候选同时发，谁先拿到 200 响应头谁接管
+  return raceDownload(candidates, githubUrl, destPath, headers);
+}
+
+/**
+ * 并发探测下载
+ * @param {string[]} mirrors 候选镜像列表
+ * @param {string} githubUrl 原始 GitHub URL
+ * @param {string} destPath 目标文件路径
+ * @param {object} headers 请求头
+ */
+function raceDownload(mirrors, githubUrl, destPath, headers) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let successMirror = null;
+    const errors = [];
+    const activeReqs = [];
+    let pendingHead = mirrors.length; // 等待响应头的请求数
+
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      // 取消所有还在跑的请求
+      for (const r of activeReqs) {
+        try { r.destroy(); } catch {}
+      }
+      try { fs.unlinkSync(destPath); } catch {}
+      if (err) reject(err);
+      else resolve();
+    };
+
+    mirrors.forEach((mirror) => {
+      const tryUrl = buildMirrorUrl(githubUrl, mirror);
+      const req = startDownloadWithHeadProbe(
+        tryUrl,
+        destPath,
+        headers,
+        // onHead: 拿到 200 响应头，接管这个请求为正式下载
+        () => {
+          if (settled) return;
+          if (successMirror === null) {
+            successMirror = mirror;
+            console.log(`[ota-apk] 并发探测胜出: ${mirror || "直连"}`);
+            // 取消其他还在等响应头的请求
+            for (const other of activeReqs) {
+              if (other !== req) {
+                try { other.destroy(); } catch {}
+              }
+            }
+          }
+        },
+        // onSuccess: 这个请求完整下载完成
+        () => {
+          if (settled) return;
+          if (preferredMirror !== mirror) {
+            preferredMirror = mirror;
+          }
+          finish(null);
+        },
+        // onError: 这个请求失败（响应头阶段或下载阶段）
+        (err) => {
+          if (settled) return;
+          errors.push(`${mirror || "直连"}: ${err.message}`);
+          // 如果是下载阶段失败（已过 onHead），且这是胜出者，整体失败
+          if (successMirror === mirror) {
+            finish(new Error(`下载中断: ${err.message}`));
+            return;
+          }
+          // 否则只是这个候选失败，等其他候选
+          pendingHead--;
+          if (pendingHead === 0 && successMirror === null) {
+            // 所有候选都没拿到 200 响应头
+            finish(new Error(`所有镜像均失败: ${errors.join("; ")}`));
+          }
+        }
+      );
+      activeReqs.push(req);
+    });
+  });
+}
+
+/**
+ * 启动一个下载请求，先探测响应头，200 才继续流式下载
+ * @param {string} url 完整 URL
+ * @param {string} destPath 目标文件
+ * @param {object} headers 请求头
+ * @param {() => void} onHead 拿到 200 响应头时调用
+ * @param {() => void} onSuccess 完整下载成功
+ * @param {(err: Error) => void} onError 失败
+ * @returns {import('http').ClientRequest} 请求对象（供外部取消）
+ */
+function startDownloadWithHeadProbe(url, destPath, headers, onHead, onSuccess, onError) {
+  const parsed = new URL(url);
+  const isHttps = parsed.protocol === "https:";
+  const lib = isHttps ? https : http;
+  const options = {
+    method: "GET",
+    hostname: parsed.hostname,
+    port: parsed.port || (isHttps ? 443 : 80),
+    path: parsed.pathname + parsed.search,
+    headers: { "User-Agent": "yunoseek-ota/1.0", ...headers },
+  };
+
+  let settled = false;
+  let stallTimer = null;
+  let ws = null;
+  let followedRedirect = false;
+  let headNotified = false; // 是否已通知 onHead（避免重定向后重复通知）
+
+  const fail = (err) => {
+    if (settled) return;
+    settled = true;
+    if (stallTimer) clearTimeout(stallTimer);
+    try { req.destroy(); } catch {}
+    if (ws) { try { ws.destroy(); } catch {} }
+    // 只有胜出者才可能创建了 ws，失败时才需要清理 destPath
+    if (ws) { try { fs.unlinkSync(destPath); } catch {} }
+    onError(err);
+  };
+  const succeed = () => {
+    if (settled) return;
+    settled = true;
+    if (stallTimer) clearTimeout(stallTimer);
+    onSuccess();
+  };
+  const resetStall = () => {
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => fail(new Error("数据流停滞超时 (30s)")), 30000);
+  };
+
+  const req = lib.request(options, (res) => {
+    // 重定向：跟随一次（ghproxy 通常会重定向到 GitHub 的 CDN）
+    if (
+      (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) &&
+      res.headers.location &&
+      !followedRedirect
+    ) {
+      followedRedirect = true;
+      res.resume();
+      const nextUrl = new URL(res.headers.location, url).href;
+      // 重新发起到新 URL，复用同一套回调（onHead 只会通知一次）
+      startDownloadWithHeadProbe(nextUrl, destPath, headers, onHead, onSuccess, onError);
+      return;
+    }
+    if (res.statusCode !== 200) {
+      res.resume();
+      return fail(new Error(`HTTP ${res.statusCode}`));
+    }
+    // 200 响应头到了：通知上层（只通知一次，触发取消其他候选 + 创建 ws）
+    if (!headNotified) {
+      headNotified = true;
+      onHead();
+    }
+    resetStall();
+    res.on("data", () => resetStall());
+    res.on("error", (e) => fail(e));
+    res.on("aborted", () => fail(new Error("响应被中止")));
+
+    // 只有胜出者才会走到这里创建 WriteStream（onHead 已让上层取消其他候选）
+    // 但保险起见：如果 ws 已存在（理论上不会），先关闭
+    if (ws) { try { ws.destroy(); } catch {} }
+    ws = fs.createWriteStream(destPath);
+    res.pipe(ws);
+    ws.on("finish", () => ws.close(succeed));
+    ws.on("error", (e) => fail(e));
+  });
+  req.on("error", (e) => fail(e));
+  req.setTimeout(30000, () => fail(new Error("建连/响应头超时 (30s)")));
+  req.end();
+  return req;
 }
 
 /**
  * 单次流式下载（自动跟随重定向）
  *
  * 超时策略：
- *   - 建连/响应头超时 30s（ghproxy 偶发卡在 TCP/TLS 握手）
+ *   - 建连/响应头超时 headTimeoutMs（默认 30s，快速路径传 5s）
  *   - 数据流停滞超时 30s（响应头已到但数据中途断流——ghproxy 最常见的卡死形态）
  *   - 这两个超时触发后都保证 reject，让上层能 fallback 到下一个镜像
  */
-function downloadToFile(targetUrl, destPath, headers = {}, maxRedirects = 5) {
+function downloadToFile(targetUrl, destPath, headers = {}, maxRedirects = 5, headTimeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(targetUrl);
     const isHttps = parsed.protocol === "https:";
@@ -247,7 +414,7 @@ function downloadToFile(targetUrl, destPath, headers = {}, maxRedirects = 5) {
       ) {
         if (stallTimer) clearTimeout(stallTimer);
         res.resume();
-        return resolve(downloadToFile(new URL(res.headers.location, targetUrl).href, destPath, headers, maxRedirects - 1));
+        return resolve(downloadToFile(new URL(res.headers.location, targetUrl).href, destPath, headers, maxRedirects - 1, headTimeoutMs));
       }
       if (res.statusCode !== 200) {
         if (stallTimer) clearTimeout(stallTimer);
@@ -266,8 +433,8 @@ function downloadToFile(targetUrl, destPath, headers = {}, maxRedirects = 5) {
       ws.on("error", (e) => fail(e));
     });
     req.on("error", (e) => fail(e));
-    // 建连/响应头阶段超时（30s）
-    req.setTimeout(30000, () => fail(new Error("建连/响应头超时 (30s)")));
+    // 建连/响应头阶段超时
+    req.setTimeout(headTimeoutMs, () => fail(new Error(`建连/响应头超时 (${headTimeoutMs / 1000}s)`)));
     req.end();
   });
 }
