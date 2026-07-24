@@ -18,6 +18,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  withSequence,
   Easing,
   runOnJS,
   type SharedValue,
@@ -51,6 +53,40 @@ function formatAnnouncementTime(timestamp: number, locale: string): string {
   } catch {
     return new Date(timestamp).toLocaleString();
   }
+}
+
+// 未读脉冲圆点：megaphone 图标右上角，scale 1→1.4→1 + opacity 1→0.6→1 无限循环
+function UnreadDot({ color }: { color: string }) {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.4, { duration: 800, easing: Easing.bezier(0.4, 0, 0.6, 1) }),
+        withTiming(1.0, { duration: 800, easing: Easing.bezier(0.4, 0, 0.6, 1) })
+      ),
+      -1,
+      false
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 800 }),
+        withTiming(1.0, { duration: 800 })
+      ),
+      -1,
+      false
+    );
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+  return (
+    <Animated.View
+      style={[styles.unreadDot, { backgroundColor: color }, style]}
+      pointerEvents="none"
+    />
+  );
 }
 
 // 单条轮播项：根据 animatedIndex 与自身 itemIndex 的差值计算 opacity/translateY
@@ -109,6 +145,24 @@ export function AnnouncementBanner() {
     if (identity) useStore.getState().markAnnouncementRead(identity);
   };
 
+  // 边缘辉光：unread 变化时 480ms 过渡（对齐用户偏好的 480ms 过渡时长）
+  const glow = useSharedValue(0);
+  useEffect(() => {
+    glow.value = withTiming(unread ? 1 : 0, {
+      duration: 480,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+    });
+  }, [unread, glow]);
+  const glowStyle = useAnimatedStyle(() => ({
+    shadowColor: theme.brand,
+    shadowRadius: glow.value * 8,
+    shadowOpacity: glow.value * 0.4,
+    shadowOffset: { width: 0, height: 0 },
+    borderColor: theme.brand,
+    borderWidth: glow.value, // 0 → 1
+    elevation: glow.value * 4, // Android shadow
+  }));
+
   const displayList = items.slice(0, MAX_VISIBLE);
   const showRotation = displayList.length > 1;
 
@@ -140,18 +194,42 @@ export function AnnouncementBanner() {
     return () => sub.remove();
   }, []);
 
-  if (items.length === 0 || dismissed) return null;
+  if (items.length === 0) return null;
+  // dismissed 但有新公告：紧凑模式（仅图标 + 脉冲圆点）
+  if (dismissed && !unread) return null;
+  if (dismissed && unread) {
+    return (
+      <TouchableOpacity onPress={openDetail} style={styles.compactBanner} hitSlop={8}>
+        <View style={{ position: "relative" }}>
+          <Ionicons
+            name="megaphone-outline"
+            size={15}
+            color={theme.brand}
+            accessible
+            accessibilityLabel={`${t("announcement")} · ${t("announcementNew")}`}
+          />
+          <UnreadDot color={theme.brand} />
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <>
       {/* 横幅（透明背景，与顶栏共享模糊/实色层，视觉一体化） */}
-      <TouchableOpacity
-        style={styles.banner}
-        onPress={openDetail}
-        activeOpacity={0.7}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          <Ionicons name="megaphone-outline" size={15} color={theme.brand} style={{ marginRight: 8 }} />
+      <Animated.View style={[styles.banner, glowStyle]}>
+        <TouchableOpacity onPress={openDetail} activeOpacity={0.7}>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <View style={{ position: "relative", marginRight: 8 }}>
+              <Ionicons
+                name="megaphone-outline"
+                size={15}
+                color={theme.brand}
+                accessible
+                accessibilityLabel={unread ? `${t("announcement")} · ${t("announcementNew")}` : t("announcement")}
+              />
+              {unread ? <UnreadDot color={theme.brand} /> : null}
+            </View>
           {/* 轮播文本容器：固定高度避免高度跳动 */}
           <View style={styles.rotatingWrap}>
             {displayList.map((item, i) => (
@@ -189,6 +267,7 @@ export function AnnouncementBanner() {
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
+      </Animated.View>
 
       {/* 公告详情 Modal（支持 HTML 富媒体） */}
       <Modal visible={detailVisible} transparent animationType="fade" onRequestClose={() => setDetailVisible(false)}>
@@ -226,6 +305,20 @@ export function AnnouncementBanner() {
 }
 
 const styles = StyleSheet.create({
+  compactBanner: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  unreadDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    zIndex: 2,
+  },
   banner: {
     flexDirection: "row",
     alignItems: "center",
