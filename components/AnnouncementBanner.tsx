@@ -24,7 +24,7 @@ import Animated, {
   runOnJS,
   type SharedValue,
 } from "react-native-reanimated";
-import { useStore, selectAnnouncementUnread, announcementIdentity, type AnnouncementItem } from "../lib/store";
+import { useStore, selectAnnouncementUnread, announcementIdentity } from "../lib/store";
 import { getTheme, resolveThemeMode } from "../lib/theme";
 import { t } from "../lib/i18n";
 import { useAnnouncement } from "../lib/use-announcement";
@@ -199,15 +199,16 @@ export function AnnouncementBanner() {
   if (dismissed && !unread) return null;
   if (dismissed && unread) {
     return (
-      <TouchableOpacity onPress={openDetail} style={styles.compactBanner} hitSlop={8}>
+      <TouchableOpacity
+        onPress={openDetail}
+        style={styles.compactBanner}
+        hitSlop={8}
+        accessible
+        accessibilityLabel={`${t("announcement")} · ${t("announcementNew")}`}
+        accessibilityRole="button"
+      >
         <View style={{ position: "relative" }}>
-          <Ionicons
-            name="megaphone-outline"
-            size={15}
-            color={theme.brand}
-            accessible
-            accessibilityLabel={`${t("announcement")} · ${t("announcementNew")}`}
-          />
+          <Ionicons name="megaphone-outline" size={15} color={theme.brand} />
           <UnreadDot color={theme.brand} />
         </View>
       </TouchableOpacity>
@@ -218,16 +219,17 @@ export function AnnouncementBanner() {
     <>
       {/* 横幅（透明背景，与顶栏共享模糊/实色层，视觉一体化） */}
       <Animated.View style={[styles.banner, glowStyle]}>
-        <TouchableOpacity onPress={openDetail} activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={openDetail}
+          activeOpacity={0.7}
+          style={{ flex: 1 }}
+          accessible
+          accessibilityLabel={unread ? `${t("announcement")} · ${t("announcementNew")}` : t("announcement")}
+          accessibilityRole="button"
+        >
           <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
             <View style={{ position: "relative", marginRight: 8 }}>
-              <Ionicons
-                name="megaphone-outline"
-                size={15}
-                color={theme.brand}
-                accessible
-                accessibilityLabel={unread ? `${t("announcement")} · ${t("announcementNew")}` : t("announcement")}
-              />
+              <Ionicons name="megaphone-outline" size={15} color={theme.brand} />
               {unread ? <UnreadDot color={theme.brand} /> : null}
             </View>
           {/* 轮播文本容器：固定高度避免高度跳动 */}
